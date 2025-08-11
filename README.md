@@ -179,35 +179,17 @@ You can now interact with the real-time chat app and start messaging!
 
 ---
 
+## ☸️ Kubernetes Deployment on AWS EC2 (Kind)
 
+This project is deployed in a **Kubernetes cluster** created with [Kind](https://kind.sigs.k8s.io/) on an **AWS EC2 instance**.
 
-### 🤝 Contributing
+The deployment includes:
 
+- **Frontend Deployment & Service**
+- **Backend Deployment & Service**
+- **MongoDB Deployment & Service**
+- **PersistentVolume (PV)** and **PersistentVolumeClaim (PVC)** for MongoDB data storage
 
-We welcome contributions from DevOps & Developer of all skill levels! Here's how you can contribute:
-
-**Report bugs:** If you encounter any bugs or issues, please open an issue with detailed information.
-**Suggest features:** Have an idea for a new feature? Open an issue to discuss it with the community.
-**Submit pull requests:** If you have a fix or a feature you'd like to contribute, submit a pull request. Ensure your changes pass any linting or tests, if applicable.
-
-### 🌐 Join the Community
-
-We invite you to join our community of developers and contributors. Let's work together to build an amazing real-time chat application!
-
-* **Star this repository** to show your support
-* **Fork this repository** to contribute to the project
-* **Open an issue** to report bugs or suggest features
-* **Submit a pull request** to contribute code changes
-
-## 🔮 Future Plans
-
-
-This project is evolving, and here are a few exciting things on the horizon:
-
-* [ ] **CI/CD Pipelines:** Implement Continuous Integration and Continuous Deployment pipelines to automate testing and deployment.
-* [ ] **Kubernetes (K8s):** Add Kubernetes manifests for container orchestration to deploy the app on cloud platforms like AWS, GCP, or Azure.
-* [ ] **Feature Expansion:** Add more features like group chats, media sharing, and user status updates.
-* **Stay tuned for updates as we continue to improve and expand this project!**
 
 ---
 
