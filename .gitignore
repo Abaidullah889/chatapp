@@ -25,3 +25,9 @@ dist-ssr
 
 .env
 *.md
+
+# Terraform — never commit downloaded providers or local state
+.terraform/
+*.tfstate
+*.tfstate.backup
+terraform.tfvars
