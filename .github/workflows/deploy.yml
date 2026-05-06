@@ -1,0 +1,144 @@
+# ============================================================
+# CI/CD Pipeline — Build, Test, Deploy to EKS
+# ============================================================
+# Triggers on every push to main.
+# Jobs:
+#   1. test   — run npm test for backend and frontend
+#   2. deploy — build Docker images, push to ECR, apply k8s manifests
+#
+# Required GitHub Secrets (Settings → Secrets and variables → Actions):
+#   AWS_ACCESS_KEY_ID      — IAM user terraform-admin access key
+#   AWS_SECRET_ACCESS_KEY  — IAM user terraform-admin secret key
+#   JWT_SECRET             — secret used to sign JWT tokens
+#   MONGO_USERNAME         — MongoDB root username
+#   MONGO_PASSWORD         — MongoDB root password
+# ============================================================
+
+name: Deploy to EKS
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION:   us-east-1
+  EKS_CLUSTER:  chatapp
+  ECR_BACKEND:  071179620185.dkr.ecr.us-east-1.amazonaws.com/chatapp-backend
+  ECR_FRONTEND: 071179620185.dkr.ecr.us-east-1.amazonaws.com/chatapp-frontend
+
+jobs:
+  # ── Job 1: Test ───────────────────────────────────────────
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install and test backend
+        run: |
+          cd backend
+          npm ci
+          npm test
+
+      - name: Install and test frontend
+        run: |
+          cd frontend
+          npm ci
+          npm test
+
+  # ── Job 2: Build, Push, Deploy ────────────────────────────
+  deploy:
+    name: Build, Push, Deploy
+    runs-on: ubuntu-latest
+    needs: test   # only runs if test job passes
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Configure the AWS CLI and SDK with the IAM user credentials.
+      # Note: OIDC-based auth is the more secure alternative for production —
+      # it avoids long-lived keys entirely. Access keys are used here for
+      # simplicity in the demo environment.
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      # Authenticates docker with ECR so subsequent docker push commands work.
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Tag with both the commit SHA (immutable, traceable) and latest (convenience).
+      - name: Build and push backend image
+        run: |
+          docker build -t $ECR_BACKEND:${{ github.sha }} -t $ECR_BACKEND:latest ./backend
+          docker push $ECR_BACKEND:${{ github.sha }}
+          docker push $ECR_BACKEND:latest
+
+      - name: Build and push frontend image
+        run: |
+          docker build -t $ECR_FRONTEND:${{ github.sha }} -t $ECR_FRONTEND:latest ./frontend
+          docker push $ECR_FRONTEND:${{ github.sha }}
+          docker push $ECR_FRONTEND:latest
+
+      # Writes ~/.kube/config so kubectl knows how to reach the EKS cluster.
+      - name: Configure kubectl
+        run: aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER
+
+      # Apply all manifests.
+      # envsubst replaces ${VARIABLE} placeholders before kubectl sees the YAML:
+      #   - secrets.yml        : ${JWT_SECRET}, ${MONGO_USERNAME}, ${MONGO_PASSWORD}
+      #   - *-deployment.yml   : ${IMAGE_TAG}
+      # Note: Kubernetes $(VAR) env-var interpolation uses parentheses — envsubst
+      # ignores those and leaves them for Kubernetes to resolve at runtime.
+      - name: Deploy to EKS
+        env:
+          IMAGE_TAG:      ${{ github.sha }}
+          JWT_SECRET:     ${{ secrets.JWT_SECRET }}
+          MONGO_USERNAME: ${{ secrets.MONGO_USERNAME }}
+          MONGO_PASSWORD: ${{ secrets.MONGO_PASSWORD }}
+        run: |
+          # Namespace must exist before anything else
+          kubectl apply -f k8s/namespace.yml
+
+          # Secrets — envsubst fills in real values from GitHub Secrets
+          envsubst '$JWT_SECRET,$MONGO_USERNAME,$MONGO_PASSWORD' \
+            < k8s/secrets.yml | kubectl apply -f -
+
+          # Storage and services (no variable substitution needed)
+          kubectl apply -f k8s/mongodb-pvc.yml
+          kubectl apply -f k8s/mongodb-service.yml
+          kubectl apply -f k8s/backend-service.yml
+          kubectl apply -f k8s/frontend-service.yml
+
+          # Deployments — envsubst fills in IMAGE_TAG
+          kubectl apply -f k8s/mongodb-deployment.yml
+          envsubst '$IMAGE_TAG' < k8s/backend-deployment.yml  | kubectl apply -f -
+          envsubst '$IMAGE_TAG' < k8s/frontend-deployment.yml | kubectl apply -f -
+
+      # Block until all three deployments finish rolling out (or timeout).
+      # If a deployment fails to become healthy, this step fails and the
+      # pipeline stops — preventing a broken image from silently going live.
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/mongodb-deployment  -n chatapp --timeout=180s
+          kubectl rollout status deployment/backend-deployment  -n chatapp --timeout=180s
+          kubectl rollout status deployment/frontend-deployment -n chatapp --timeout=180s
+
+      # Print the external URL so it's easy to find in the Actions log.
+      - name: Print frontend URL
+        run: |
+          echo "=== Frontend LoadBalancer URL ==="
+          kubectl get svc frontend -n chatapp \
+            -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+          echo ""
