@@ -3,27 +3,42 @@ kind: Deployment
 metadata:
   name: frontend-deployment
   namespace: chatapp
-spec: 
+spec:
   replicas: 1
   selector:
-    matchLabels: 
+    matchLabels:
       app: frontend
   template:
-    metadata: 
+    metadata:
       name: frontend-pod
       namespace: chatapp
       labels:
         app: frontend
-    spec: 
+    spec:
       containers:
-      - name: chatapp-frontend
-        image: abaidullah889/chatapp-frontend:latest
-        ports:
-          - containerPort: 80
-        env:
-          - name: NODE_ENV
-            value: production
-
-
-
-  
+        - name: chatapp-frontend
+          # ECR image — ${IMAGE_TAG} is replaced by envsubst in CI/CD with the commit SHA
+          image: 071179620185.dkr.ecr.us-east-1.amazonaws.com/chatapp-frontend:${IMAGE_TAG}
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3

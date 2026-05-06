@@ -22,8 +22,11 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(
   cors({
-    origin: process.env.NODE_ENV === "production" 
-      ? ["http://localhost:8080", "http://localhost"] 
+    // In production, CORS_ORIGIN can be set to the frontend LoadBalancer URL to restrict
+    // access. When empty/unset, origin:true reflects the caller's Origin header, which is
+    // required for withCredentials:true to work without knowing the LB URL upfront.
+    origin: process.env.NODE_ENV === "production"
+      ? process.env.CORS_ORIGIN || true
       : "http://localhost:5173",
     credentials: true,
   })

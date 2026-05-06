@@ -6,6 +6,9 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
+  # gp2 tells the EBS CSI driver to dynamically create an EBS volume.
+  # No manual PV needed — EKS handles it automatically.
+  storageClassName: gp2
   resources:
     requests:
       storage: 5Gi

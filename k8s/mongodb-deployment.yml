@@ -3,13 +3,13 @@ kind: Deployment
 metadata:
   name: mongodb-deployment
   namespace: chatapp
-spec: 
+spec:
   replicas: 1
   selector:
     matchLabels:
       app: mongodb
   template:
-    metadata: 
+    metadata:
       name: mongodb-pod
       namespace: chatapp
       labels:
@@ -17,22 +17,50 @@ spec:
     spec:
       containers:
         - name: chatapp-mongodb
-          image: mongo:latest
+          # Pinned to 7.0 — avoid surprise breaking changes from :latest
+          image: mongo:7.0
           ports:
-             - containerPort: 27017
+            - containerPort: 27017
           env:
             - name: MONGO_INITDB_ROOT_USERNAME
-              value: mongoadmin
+              valueFrom:
+                secretKeyRef:
+                  name: secrets
+                  key: mongo-username
             - name: MONGO_INITDB_ROOT_PASSWORD
-              value: secret
+              valueFrom:
+                secretKeyRef:
+                  name: secrets
+                  key: mongo-password
           volumeMounts:
             - name: mongo-data
               mountPath: /data/db
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            exec:
+              command:
+                - mongosh
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            exec:
+              command:
+                - mongosh
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
       volumes:
         - name: mongo-data
           persistentVolumeClaim:
             claimName: mongodb-pvc
-
-        
-
-
