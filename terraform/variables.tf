@@ -22,9 +22,9 @@ variable "kubernetes_version" {
 }
 
 variable "node_instance_type" {
-  description = "EC2 instance type for EKS worker nodes (t3.medium balances cost vs capacity)"
+  description = "EC2 instance type for EKS worker nodes"
   type        = string
-  default     = "t3.medium"
+  default     = "t3.small"
 }
 
 variable "node_desired_count" {
