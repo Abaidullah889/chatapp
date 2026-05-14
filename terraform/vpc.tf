@@ -16,11 +16,12 @@ module "vpc" {
   private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
   public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
 
-  # Single NAT gateway: worker nodes in private subnets can reach the internet
-  # (to pull images from ECR and talk to the EKS API) at minimum cost.
-  enable_nat_gateway   = true
-  single_nat_gateway   = true
-  enable_dns_hostnames = true
+  # One NAT gateway per AZ: if one AZ goes down, worker nodes in the other
+  # AZ still have their own NAT and can reach ECR / the EKS API.
+  enable_nat_gateway     = true
+  single_nat_gateway     = false
+  one_nat_gateway_per_az = true
+  enable_dns_hostnames   = true
 
   # These subnet tags are required by EKS for subnet auto-discovery when
   # creating LoadBalancer services (the frontend will use one).

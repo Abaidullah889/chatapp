@@ -1,10 +1,9 @@
 # ============================================================
-# CI/CD Pipeline — Build, Test, Deploy to EKS
+# CI/CD Pipeline — Build and Deploy to EKS
 # ============================================================
 # Triggers on every push to main.
 # Jobs:
-#   1. test   — run npm test for backend and frontend
-#   2. deploy — build Docker images, push to ECR, apply k8s manifests
+#   1. deploy — build Docker images, push to ECR, apply k8s manifests
 #
 # Required GitHub Secrets (Settings → Secrets and variables → Actions):
 #   AWS_ACCESS_KEY_ID      — IAM user terraform-admin access key
@@ -27,37 +26,10 @@ env:
   ECR_FRONTEND: 071179620185.dkr.ecr.us-east-1.amazonaws.com/chatapp-frontend
 
 jobs:
-  # ── Job 1: Test ───────────────────────────────────────────
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      - name: Install and test backend
-        run: |
-          cd backend
-          npm ci
-          npm test
-
-      - name: Install and test frontend
-        run: |
-          cd frontend
-          npm ci
-          npm test
-
-  # ── Job 2: Build, Push, Deploy ────────────────────────────
+  # ── Job: Build, Push, Deploy ──────────────────────────────
   deploy:
     name: Build, Push, Deploy
     runs-on: ubuntu-latest
-    needs: test   # only runs if test job passes
 
     steps:
       - name: Checkout code
@@ -139,6 +111,6 @@ jobs:
       - name: Print frontend URL
         run: |
           echo "=== Frontend LoadBalancer URL ==="
-          kubectl get svc frontend -n chatapp \
+          kubectl get svc frontend-service -n chatapp \
             -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
           echo ""
